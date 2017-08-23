@@ -74,7 +74,63 @@ Point2f computeIntersect(Line l1, Line l2) {
         return Point2f(-1, -1);
 }
 
-void scan(String file, String out, bool debug = true) {
+
+// https://stackoverflow.com/questions/32848301/image-quality-improvement-in-opencv
+// not yet used
+void imadjust(const Mat1b& src, Mat1b& dst, int tol = 1, Vec2i in = Vec2i(0, 255), Vec2i out = Vec2i(0, 255))
+{
+        // src : input CV_8UC1 image
+        // dst : output CV_8UC1 imge
+        // tol : tolerance, from 0 to 100.
+        // in  : src image bounds
+        // out : dst image bounds
+
+        dst = src.clone();
+
+        tol = max(0, min(100, tol));
+
+        if (tol > 0)
+        {
+                // Compute in and out limits
+
+                // Histogram
+                vector<int> hist(256, 0);
+                for (int r = 0; r < src.rows; ++r) {
+                        for (int c = 0; c < src.cols; ++c) {
+                                hist[src(r, c)]++;
+                        }
+                }
+
+                // Cumulative histogram
+                vector<int> cum = hist;
+                for (int i = 1; i < hist.size(); ++i) {
+                        cum[i] = cum[i - 1] + hist[i];
+                }
+
+                // Compute bounds
+                int total = src.rows * src.cols;
+                int low_bound = total * tol / 100;
+                int upp_bound = total * (100 - tol) / 100;
+                in[0] = distance(cum.begin(), lower_bound(cum.begin(), cum.end(), low_bound));
+                in[1] = distance(cum.begin(), lower_bound(cum.begin(), cum.end(), upp_bound));
+
+        }
+
+        // Stretching
+        float scale = float(out[1] - out[0]) / float(in[1] - in[0]);
+        for (int r = 0; r < dst.rows; ++r)
+        {
+                for (int c = 0; c < dst.cols; ++c)
+                {
+                        int vs = max(src(r, c) - in[0], 0);
+                        int vd = min(int(vs * scale + 0.5f) + out[0], out[1]);
+                        dst(r, c) = saturate_cast<uchar>(vd);
+                }
+        }
+}
+
+
+void scan(String file, String out, bool debug = true, int ppi = 200, bool adjust = false) {
 
         /* get input image */
         Mat img = imread(file);
@@ -142,7 +198,7 @@ void scan(String file, String out, bool debug = true) {
         /* perspective transformation */
 
         // define the destination image size: A4 - 200 PPI
-        int w_a4 = 1654, h_a4 = 2339;
+        int w_a4 = ppi*8.27, h_a4 = ppi*11.7;
         //int w_a4 = 595, h_a4 = 842;
         Mat dst = Mat::zeros(h_a4, w_a4, CV_8UC3);
 
@@ -175,8 +231,25 @@ void scan(String file, String out, bool debug = true) {
         // apply perspective transformation
         warpPerspective(img, dst, transmtx, dst.size());
 
-        // save dst img
-        imwrite(out, dst);
+        // adjust if necessary
+        if (adjust) {
+                vector<Mat1b> planes;
+                split(dst, planes);
+                for (int i = 0; i < 3; ++i)
+                {
+                        imadjust(planes[i], planes[i]);
+                }
+
+                Mat result;
+                merge(planes, result);
+                imwrite(out, result);
+
+        } else {
+
+                // save dst img
+                imwrite(out, dst);
+
+        }
 
         // for visualization only
         if (debug) {
@@ -190,70 +263,19 @@ void scan(String file, String out, bool debug = true) {
 }
 
 
-// https://stackoverflow.com/questions/32848301/image-quality-improvement-in-opencv
-// not yet used
-void imadjust(const Mat1b& src, Mat1b& dst, int tol = 1, Vec2i in = Vec2i(0, 255), Vec2i out = Vec2i(0, 255))
-{
-        // src : input CV_8UC1 image
-        // dst : output CV_8UC1 imge
-        // tol : tolerance, from 0 to 100.
-        // in  : src image bounds
-        // out : dst image buonds
-
-        dst = src.clone();
-
-        tol = max(0, min(100, tol));
-
-        if (tol > 0)
-        {
-                // Compute in and out limits
-
-                // Histogram
-                vector<int> hist(256, 0);
-                for (int r = 0; r < src.rows; ++r) {
-                        for (int c = 0; c < src.cols; ++c) {
-                                hist[src(r, c)]++;
-                        }
-                }
-
-                // Cumulative histogram
-                vector<int> cum = hist;
-                for (int i = 1; i < hist.size(); ++i) {
-                        cum[i] = cum[i - 1] + hist[i];
-                }
-
-                // Compute bounds
-                int total = src.rows * src.cols;
-                int low_bound = total * tol / 100;
-                int upp_bound = total * (100 - tol) / 100;
-                in[0] = distance(cum.begin(), lower_bound(cum.begin(), cum.end(), low_bound));
-                in[1] = distance(cum.begin(), lower_bound(cum.begin(), cum.end(), upp_bound));
-
-        }
-
-        // Stretching
-        float scale = float(out[1] - out[0]) / float(in[1] - in[0]);
-        for (int r = 0; r < dst.rows; ++r)
-        {
-                for (int c = 0; c < dst.cols; ++c)
-                {
-                        int vs = max(src(r, c) - in[0], 0);
-                        int vd = min(int(vs * scale + 0.5f) + out[0], out[1]);
-                        dst(r, c) = saturate_cast<uchar>(vd);
-                }
-        }
-}
-
 int main(int argc, char** argv) {
         po::options_description desc("Allowed options");
         desc.add_options()
                 ("help,h", "help message")
-                ("verbose,v", po::value<int>()->implicit_value(1),
+                ("adjust,a", "adjust image")
+                ("verbose,v", po::value<int>()->implicit_value(1)->default_value(0),
                 "enable verbosity (optionally specify level)")
                 ("image,i", po::value< vector<string> >(),
                 "input image")
                 ("output,o", po::value<string>()->default_value("output"),
                 "output folder")
+                ("ppi,p", po::value<int>()->default_value(200),
+                "pixel per inch")
         ;
 
         po::positional_options_description p;
@@ -276,16 +298,19 @@ int main(int argc, char** argv) {
                 cout << desc << "\n";
                 return 1;
         }
-        if (args.count("verbose")) {
-                cout << "Verbosity enabled.  Level is " << args["verbose"].as<int>()
-                     << "\n";
-        }
+        //if (args.count("verbose")) {
+        //        cout << "Verbosity enabled.  Level is " << args["verbose"].as<int>()
+        //             << "\n";
+        //}
         if (args.count("image")) {
                 BOOST_FOREACH( string file, args["image"].as< vector<string> >() ) {
                         cout << "Processing: " << file << "\n";
                         scan(file,
                              args["output"].as<string>() + "/" + file,
-                             args.count("verbose") ? (args["verbose"].as<int>() > 0) : false);
+                             args["verbose"].as<int>() > 0,
+                             args["ppi"].as<int>(),
+                             args.count("adjust")
+                             );
                 }
                 exit( EXIT_SUCCESS );
         }
