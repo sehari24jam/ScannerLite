@@ -3,7 +3,10 @@
 
 BIN = scannerLite
 C++ := clang
-C++FLAGS +=  -lopencv_core -lopencv_imgproc -lopencv_highgui -lboost_program_options -lstdc++
+C++FLAGS += -lopencv_core -lopencv_imgproc -lopencv_highgui
+C++FLAGS += -lboost_program_options
+C++FLAGS += -lboost_system -lboost_filesystem
+C++FLAGS += -lstdc++
 
 clean:
 	@rm -f $(BIN)

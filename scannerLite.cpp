@@ -6,6 +6,7 @@
  */
 #include <boost/program_options.hpp>
 #include <boost/foreach.hpp>
+#include <boost/filesystem.hpp>
 #include <opencv2/opencv.hpp>
 #include <algorithm>
 #include <string>
@@ -15,6 +16,7 @@
 #include <iterator>
 
 using namespace boost;
+using namespace boost::filesystem;
 namespace po = boost::program_options;
 using namespace cv;
 using namespace std;
@@ -25,6 +27,7 @@ ostream& operator<<(ostream& os, const vector<T>& v) {
         copy(v.begin(), v.end(), ostream_iterator<T>(os, " "));
         return os;
 }
+
 /**
  * Get edges of an image
  * @param gray - grayscale input image
@@ -304,9 +307,14 @@ int main(int argc, char** argv) {
         //}
         if (args.count("image")) {
                 BOOST_FOREACH( string file, args["image"].as< vector<string> >() ) {
-                        cout << "Processing: " << file << "\n";
+                        path fin(file);
+                        path fout(args["output"].as<string>());
+                        fout /= fin.filename();
+
+                        cout << "Processing: " << fin << " -> " << fout << "\n";
+
                         scan(file,
-                             args["output"].as<string>() + "/" + file,
+                             fout.string(),
                              args["verbose"].as<int>() > 0,
                              args["ppi"].as<int>(),
                              args.count("adjust")
