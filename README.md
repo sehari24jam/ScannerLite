@@ -19,30 +19,31 @@ Links below are kept as historical reference. They might not available anymore.
 
 Input image 1:
 
-![](/images/doc1.jpg?raw=true "Input image 1")
+![](/blob/master/images/doc1.jpg?raw=true "Input image 1")
 
 Extraction result 1:
 
-![](/output/dst1.jpg?raw=true "Output image 1")
+![](/blob/master/output/dst1.jpg?raw=true "Output image 1")
 
 Input image 2:
 
-![](/images/doc2.jpg?raw=true "Input image 2")
+![](/blob/master/images/doc2.jpg?raw=true "Input image 2")
 
 Extraction result 2:
 
-![](/output/dst2.jpg?raw=true "Output image 2")
+![](/blob/master/output/dst2.jpg?raw=true "Output image 2")
 
 Input image 3:
 
-![](/images/doc3.jpg?raw=true "Input image 3")
+![](/blob/master/images/doc3.jpg?raw=true "Input image 3")
 
 Extraction result 3:
 
-![](/output/dst3.jpg?raw=true "Output image 3")
+![](/blob/master/output/dst3.jpg?raw=true "Output image 3")
 
 
 ## Extra feature added
 
 * provide cmd-line option using boost library
 * adding image contrast enhancement
+* make file
