@@ -133,7 +133,7 @@ void imadjust(const Mat1b& src, Mat1b& dst, int tol = 1, Vec2i in = Vec2i(0, 255
 }
 
 
-void scan(String file, String out, bool debug = true, int ppi = 200, bool adjust = false) {
+void scan(String file, String out, bool debug = true, int dpi = 200, bool adjust = false) {
 
         /* get input image */
         Mat img = imread(file);
@@ -200,8 +200,8 @@ void scan(String file, String out, bool debug = true, int ppi = 200, bool adjust
 
         /* perspective transformation */
 
-        // define the destination image size: A4 - 200 PPI
-        int w_a4 = ppi*8.27, h_a4 = ppi*11.7;
+        // define the destination image size: A4 - 200 dpi
+        int w_a4 = dpi*8.27, h_a4 = dpi*11.7;
         //int w_a4 = 595, h_a4 = 842;
         Mat dst = Mat::zeros(h_a4, w_a4, CV_8UC3);
 
@@ -277,8 +277,10 @@ int main(int argc, char** argv) {
                 "input image")
                 ("output,o", po::value<string>()->default_value("output"),
                 "output folder")
-                ("ppi,p", po::value<int>()->default_value(200),
-                "pixel per inch")
+                ("prefix,p", po::value<string>()->default_value(""),
+                "out file prefix")
+                ("dpi,d", po::value<int>()->default_value(200),
+                "dot per inch")
         ;
 
         po::positional_options_description p;
@@ -305,18 +307,21 @@ int main(int argc, char** argv) {
         //        cout << "Verbosity enabled.  Level is " << args["verbose"].as<int>()
         //             << "\n";
         //}
+        if (args.count("adjust") && args["verbose"].as<int>()) {
+                cout << "Adjusting image.\n";
+        }
         if (args.count("image")) {
                 BOOST_FOREACH( string file, args["image"].as< vector<string> >() ) {
                         path fin(file);
                         path fout(args["output"].as<string>());
-                        fout /= fin.filename();
+                        fout /= args["prefix"].as<string>() + fin.filename().string();
 
                         cout << "Processing: " << fin << " -> " << fout << "\n";
 
                         scan(fin.string(),
                              fout.string(),
-                             args["verbose"].as<int>() > 0,
-                             args["ppi"].as<int>(),
+                             args["verbose"].as<int>(),
+                             args["dpi"].as<int>(),
                              args.count("adjust")
                              );
                 }
