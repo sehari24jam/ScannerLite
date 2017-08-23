@@ -4,13 +4,28 @@
  * An OpenCV program implementing the recognition feature of the app "CamScanner". 
  * It extracts the main document object from an image and adjust it to A4 size. 
  */
+#include <boost/program_options.hpp>
+#include <boost/foreach.hpp>
 #include <opencv2/opencv.hpp>
 #include <algorithm>
 #include <string>
 #include <vector>
+#include <cstdlib>
+#include <iostream>
+#include <iterator>
+
+using namespace boost;
+namespace po = boost::program_options;
 using namespace cv;
 using namespace std;
 
+// A helper function to simplify the main part.
+template<class T>
+ostream& operator<<(ostream& os, const vector<T>& v)
+{
+    copy(v.begin(), v.end(), ostream_iterator<T>(os, " ")); 
+    return os;
+}
 /**
  * Get edges of an image
  * @param gray - grayscale input image
@@ -60,7 +75,7 @@ Point2f computeIntersect(Line l1, Line l2) {
   return Point2f(-1, -1);
 }
 
-void scan(String file, bool debug = true) {
+void scan(String file, String out, bool debug = true) {
 
   /* get input image */
   Mat img = imread(file);
@@ -162,7 +177,7 @@ void scan(String file, bool debug = true) {
   warpPerspective(img, dst, transmtx, dst.size());
 
   // save dst img
-  imwrite("dst.jpg", dst);
+  imwrite(out, dst);
 
   // for visualization only
   if (debug) {
@@ -175,8 +190,102 @@ void scan(String file, bool debug = true) {
   }
 }
 
+void imadjust(const Mat1b& src, Mat1b& dst, int tol = 1, Vec2i in = Vec2i(0, 255), Vec2i out = Vec2i(0, 255))
+{
+    // src : input CV_8UC1 image
+    // dst : output CV_8UC1 imge
+    // tol : tolerance, from 0 to 100.
+    // in  : src image bounds
+    // out : dst image buonds
+
+    dst = src.clone();
+
+    tol = max(0, min(100, tol));
+
+    if (tol > 0)
+    {
+        // Compute in and out limits
+
+        // Histogram
+        vector<int> hist(256, 0);
+        for (int r = 0; r < src.rows; ++r) {
+            for (int c = 0; c < src.cols; ++c) {
+                hist[src(r, c)]++;
+            }
+        }
+
+        // Cumulative histogram
+        vector<int> cum = hist;
+        for (int i = 1; i < hist.size(); ++i) {
+            cum[i] = cum[i - 1] + hist[i];
+        }
+
+        // Compute bounds
+        int total = src.rows * src.cols;
+        int low_bound = total * tol / 100;
+        int upp_bound = total * (100 - tol) / 100;
+        in[0] = distance(cum.begin(), lower_bound(cum.begin(), cum.end(), low_bound));
+        in[1] = distance(cum.begin(), lower_bound(cum.begin(), cum.end(), upp_bound));
+
+    }
+
+    // Stretching
+    float scale = float(out[1] - out[0]) / float(in[1] - in[0]);
+    for (int r = 0; r < dst.rows; ++r)
+    {
+        for (int c = 0; c < dst.cols; ++c)
+        {
+            int vs = max(src(r, c) - in[0], 0);
+            int vd = min(int(vs * scale + 0.5f) + out[0], out[1]);
+            dst(r, c) = saturate_cast<uchar>(vd);
+        }
+  }
+}
+
 int main(int argc, char** argv) {
-  string img_path[] = {"images/doc1.jpg", "images/doc2.jpg", "images/doc3.jpg"};
-  scan(img_path[2]);
+  po::options_description desc("Allowed options");
+  desc.add_options()
+      ("help,h"    , "help message")
+      ("verbose,v" , po::value<int>()->implicit_value(1),
+                     "enable verbosity (optionally specify level)")
+      ("image,i"   , po::value< vector<string> >(), 
+                     "input image")
+      ("output,o"   , po::value<string>()->default_value("output"), 
+                     "output folder")
+  ;
+  
+  po::positional_options_description p;
+  p.add("image,i", -1);
+
+  po::variables_map args;
+  try {
+        po::store(
+            po::command_line_parser(argc, argv).options(desc).positional(p).run(),
+            args
+        );
+  }
+  catch (po::error const& e) {
+        std::cerr << e.what() << '\n';
+        exit( EXIT_FAILURE );
+  }
+  po::notify(args);
+
+  if (args.count("help")) {
+      cout << desc << "\n";
+      return 1;
+  }
+  if (args.count("verbose")) {
+    cout << "Verbosity enabled.  Level is " << args["verbose"].as<int>()
+         << "\n";
+  }
+  if (args.count("image")) {
+      BOOST_FOREACH( string file, args["image"].as< vector<string> >() ) {
+         cout << "Processing: " << file << "\n";
+         scan(file, 
+              args["output"].as<string>() + "/" + file,
+              args.count("verbose") ? (args["verbose"].as<int>() > 0) : false);
+      }
+      exit( EXIT_SUCCESS );
+  }
   return 0;
 }
