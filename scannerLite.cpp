@@ -313,7 +313,7 @@ int main(int argc, char** argv) {
 
                         cout << "Processing: " << fin << " -> " << fout << "\n";
 
-                        scan(file,
+                        scan(fin.string(),
                              fout.string(),
                              args["verbose"].as<int>() > 0,
                              args["ppi"].as<int>(),
